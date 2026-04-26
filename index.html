@@ -1,53 +1,321 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Globální přesné hodiny</title>
+    <style>
+        :root {
+            --bg: #000;
+            --text: #fff;
+            --accent: #00e5ff;
+            --muted: #888;
+            --card: #0d0d0d;
+            --border: #222;
+        }
+
+        * { box-sizing: border-box; }
+
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg); color: var(--text);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* ─────────────── AUTH SCREEN ─────────────── */
+        #auth-screen {
+            position: fixed; z-index: 1000;
+            inset: 0;
+            background: #000;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            gap: 16px;
+            padding: 20px;
+        }
+
+        .auth-title {
+            font-size: clamp(1.1rem, 4vw, 1.5rem);
+            color: var(--accent);
+            letter-spacing: 6px;
+            text-transform: uppercase;
+            font-weight: 300;
+            margin-bottom: 10px;
+        }
+
+        .pass-wrapper {
+            position: relative;
+            width: min(320px, 90vw);
+        }
+
+        #pass-input {
+            width: 100%;
+            background: #111;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 15px 50px 15px 18px;
+            font-size: clamp(1.2rem, 5vw, 1.6rem);
+            text-align: center;
+            border-radius: 10px;
+            outline: none;
+            letter-spacing: 4px;
+            transition: border-color 0.3s;
+        }
+        #pass-input:focus { border-color: var(--accent); }
+
+        /* Eye toggle button */
+        #eye-btn {
+            position: absolute;
+            right: 12px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none;
+            cursor: pointer; padding: 6px;
+            color: var(--muted);
+            transition: color 0.2s;
+            display: flex; align-items: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #eye-btn:hover { color: var(--accent); }
+        #eye-btn svg { width: 22px; height: 22px; pointer-events: none; }
+
+        #auth-btn {
+            width: min(320px, 90vw);
+            background: var(--accent); color: #000;
+            border: none; padding: 14px;
+            font-size: clamp(0.85rem, 3vw, 1rem);
+            font-weight: 700; letter-spacing: 3px;
+            cursor: pointer; border-radius: 8px;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        #auth-btn:hover { opacity: 0.85; }
+        #auth-btn:active { transform: scale(0.98); }
+
+        .auth-error {
+            color: #ff4d4d;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+            min-height: 20px;
+        }
+
+        /* ─────────────── MAIN CONTENT ─────────────── */
+        #main-content {
+            display: none;
+            width: 100%; height: 100%;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* ── NAV ── */
+        nav {
+            position: absolute; top: 0; left: 0; right: 0;
+            padding: clamp(10px, 3vw, 20px) clamp(10px, 4vw, 30px);
+            display: flex; justify-content: center; align-items: center;
+            gap: 10px; flex-wrap: wrap;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.4s;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%);
+        }
+        body:hover nav, nav:focus-within { opacity: 1; }
+
+        /* Always visible on touch devices */
+        @media (hover: none) {
+            nav { opacity: 1; background: rgba(0,0,0,0.5); position: relative; }
+        }
+
+        #city-selector {
+            background: #1a1a1a; color: #fff;
+            border: 1px solid var(--border);
+            padding: clamp(7px, 2vw, 11px) clamp(10px, 3vw, 16px);
+            border-radius: 7px; cursor: pointer;
+            font-size: clamp(0.75rem, 2.5vw, 0.9rem);
+            max-width: calc(100vw - 120px);
+        }
+
+        button.fs {
+            background: #1a1a1a; color: #fff;
+            border: 1px solid var(--border);
+            padding: clamp(7px, 2vw, 11px) clamp(10px, 2.5vw, 14px);
+            border-radius: 7px; cursor: pointer;
+            font-size: clamp(0.75rem, 2.5vw, 0.9rem);
+            white-space: nowrap;
+        }
+        button.fs:hover { border-color: var(--accent); }
+
+        /* ── CLOCK DISPLAY ── */
+        .display {
+            flex: 1; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            text-align: center;
+            padding: 20px;
+            cursor: pointer;
+        }
+
+        /* On touch: compensate for nav taking space */
+        @media (hover: none) {
+            .display { flex: 1; }
+        }
+
+        #clock {
+            /* Responsive: uses vw on wide, vmin/vh combo on mobile */
+            font-size: clamp(2.5rem, 18vw, 18vw);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            margin: 0;
+            line-height: 1;
+            /* Prevent line-wrap on small screens */
+            white-space: nowrap;
+            letter-spacing: -0.02em;
+        }
+
+        /* On very small screens cap to fit width */
+        @media (max-width: 480px) {
+            #clock { font-size: min(18vw, 15vh); }
+        }
+        @media (orientation: landscape) and (max-height: 500px) {
+            #clock { font-size: min(20vw, 28vh); }
+        }
+
+        #date {
+            font-size: clamp(0.7rem, 2.2vw, 1.6rem);
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: clamp(2px, 0.5vw, 5px);
+            margin-top: clamp(8px, 1.5vw, 18px);
+        }
+
+        #location {
+            color: var(--accent);
+            font-size: clamp(0.65rem, 1.4vw, 1.2rem);
+            margin-top: clamp(6px, 1.2vw, 16px);
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+
+        /* Landscape mobile: tighten spacing */
+        @media (orientation: landscape) and (max-height: 500px) {
+            #date { margin-top: 4px; }
+            #location { margin-top: 4px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══════════ AUTH ═══════════ -->
+<div id="auth-screen">
+    <div class="auth-title">⬡ Hodiny</div>
+    <div class="pass-wrapper">
+        <input type="password" id="pass-input" placeholder="Heslo" autocomplete="off" inputmode="numeric">
+        <button id="eye-btn" type="button" onclick="toggleEye()" aria-label="Zobrazit heslo">
+            <!-- EYE CLOSED (default - password hidden) -->
+            <svg id="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+        </button>
+    </div>
+    <button id="auth-btn" onclick="checkPass()">VSTOUPIT</button>
+    <div class="auth-error" id="err-msg"></div>
+</div>
+
+<!-- ═══════════ MAIN ═══════════ -->
+<div id="main-content">
+    <nav>
+        <select id="city-selector" onchange="refresh()">
+            <optgroup label="Česká republika">
+                <option value="Europe/Prague|cs-CZ">Praha (CZ)</option>
+            </optgroup>
+            <optgroup label="Rusko (Sibiř)">
+                <option value="Asia/Novosibirsk|ru-RU">Prokopjevsk (RU)</option>
+                <option value="Asia/Novosibirsk|ru-RU">Letiště Tolmačevo OVB (RU)</option>
+            </optgroup>
+            <optgroup label="Mezinárodní letiště">
+                <option value="Europe/Vienna|cs-CZ">Letiště Vídeň (VIE)</option>
+                <option value="Europe/Istanbul|cs-CZ">Letiště Istanbul (IST)</option>
+            </optgroup>
+            <optgroup label="Ostatní svět">
+                <option value="Europe/Moscow|ru-RU">Moskva (RU)</option>
+                <option value="Europe/London|en-GB">Londýn (UK)</option>
+                <option value="America/New_York|en-US">New York (US)</option>
+            </optgroup>
+        </select>
+        <button class="fs" onclick="toggleFS()">⛶ Celá obrazovka</button>
+    </nav>
+
+    <div class="display" onclick="toggleFS()">
+        <div id="clock">00:00:00</div>
+        <div id="date">---</div>
+        <div id="location">---</div>
+    </div>
+</div>
+
 <script>
-    const MOJE_HESLO = "1234";
+    const MOJE_HESLO = "321";
+    let eyeVisible = false;
 
+    /* ── Eye toggle ── */
+    function toggleEye() {
+        eyeVisible = !eyeVisible;
+        const inp = document.getElementById('pass-input');
+        const icon = document.getElementById('eye-icon');
+        inp.type = eyeVisible ? 'text' : 'password';
+        icon.innerHTML = eyeVisible
+            ? /* EYE OPEN */
+              `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+               <circle cx="12" cy="12" r="3"/>`
+            : /* EYE CROSSED */
+              `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+               <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+               <line x1="1" y1="1" x2="23" y2="23"/>`;
+    }
+
+    /* ── Auth ── */
     function checkPass() {
-        const input = document.getElementById('pass-input').value.trim();
-
+        const input = document.getElementById('pass-input').value;
         if (input === MOJE_HESLO) {
             document.getElementById('auth-screen').style.display = 'none';
-            document.getElementById('main-content').style.display = 'flex';
-
-            refresh();
+            const mc = document.getElementById('main-content');
+            mc.style.display = 'flex';
             setInterval(refresh, 1000);
+            refresh();
         } else {
-            alert("Nesprávný kód!");
+            const err = document.getElementById('err-msg');
+            err.textContent = 'Nesprávný kód!';
+            document.getElementById('pass-input').value = '';
+            eyeVisible = false;
+            document.getElementById('pass-input').type = 'password';
+            // Reset eye icon
+            document.getElementById('eye-icon').innerHTML =
+                `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                 <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                 <line x1="1" y1="1" x2="23" y2="23"/>`;
+            setTimeout(() => err.textContent = '', 2500);
         }
     }
 
+    /* ── Clock ── */
     function refresh() {
-        const selector = document.getElementById('city-selector');
-        const selection = selector.value.split('|');
-
-        const timeZone = selection[0];
-        const locale = selection[1];
-
+        const sel = document.getElementById('city-selector');
+        const [timeZone, locale] = sel.value.split('|');
         const now = new Date();
 
-        const timeFormatter = new Intl.DateTimeFormat(locale, {
-            timeZone: timeZone,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false
-        });
+        document.getElementById('clock').textContent =
+            new Intl.DateTimeFormat(locale, {
+                timeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            }).format(now);
 
-        const dateFormatter = new Intl.DateTimeFormat(locale, {
-            timeZone: timeZone,
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long'
-        });
+        document.getElementById('date').textContent =
+            new Intl.DateTimeFormat(locale, {
+                timeZone, weekday: 'long', day: 'numeric', month: 'long'
+            }).format(now);
 
-        document.getElementById('clock').innerText = timeFormatter.format(now);
-        document.getElementById('date').innerText = dateFormatter.format(now);
-
-        const currentText = selector.options[selector.selectedIndex].text;
-
-        // ❗ ВАЖНО: исправлено (были пропущены обратные кавычки)
-        document.getElementById('location').innerText = `Lokalita: ${currentText}`;
+        document.getElementById('location').textContent =
+            'Lokalita: ' + sel.options[sel.selectedIndex].text;
     }
 
+    /* ── Fullscreen ── */
     function toggleFS() {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen().catch(() => {});
@@ -56,15 +324,10 @@
         }
     }
 
-    // ENTER работает везде (ПК + мобилки с клавиатурой)
-    document.getElementById('pass-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            checkPass();
-        }
+    /* ── Keyboard enter ── */
+    document.getElementById('pass-input').addEventListener('keydown', e => {
+        if (e.key === 'Enter') checkPass();
     });
-
-    // Автофокус (удобно на ПК)
-    window.onload = () => {
-        document.getElementById('pass-input').focus();
-    };
 </script>
+</body>
+</html>
