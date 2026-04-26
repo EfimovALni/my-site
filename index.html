@@ -1,211 +1,250 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ламповые часы + мини-игра</title>
-
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      min-height: 100vh;
-      font-family: Arial, sans-serif;
-      background: radial-gradient(circle at top, #2b1d13, #090604 70%);
-      color: #ffd28a;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 20px;
-      overflow: hidden;
-    }
-
-    .app {
-      width: 100%;
-      max-width: 900px;
-      text-align: center;
-    }
-
-    h1 {
-      margin-bottom: 20px;
-      font-size: clamp(24px, 5vw, 44px);
-      color: #ffe0a3;
-      text-shadow: 0 0 15px #ff8c00;
-    }
-
-    .clock {
-      background: rgba(40, 20, 5, 0.85);
-      border: 2px solid #ff9d00;
-      border-radius: 24px;
-      padding: 25px;
-      margin-bottom: 25px;
-      box-shadow:
-        0 0 25px #ff7b00,
-        inset 0 0 20px rgba(255, 150, 0, 0.3);
-    }
-
-    .time {
-      font-size: clamp(42px, 12vw, 110px);
-      font-weight: bold;
-      letter-spacing: 6px;
-      color: #ffb347;
-      text-shadow:
-        0 0 8px #ff7b00,
-        0 0 20px #ff4500,
-        0 0 40px #ff2200;
-    }
-
-    .date {
-      margin-top: 10px;
-      font-size: clamp(16px, 4vw, 26px);
-      color: #ffe0a3;
-    }
-
-    .game {
-      position: relative;
-      width: 100%;
-      height: 300px;
-      background: rgba(0, 0, 0, 0.35);
-      border: 2px solid #9c5b12;
-      border-radius: 24px;
-      overflow: hidden;
-      box-shadow: inset 0 0 25px rgba(255, 153, 0, 0.2);
-    }
-
-    .score {
-      margin-bottom: 12px;
-      font-size: 22px;
-    }
-
-    .firefly {
-      position: absolute;
-      width: 55px;
-      height: 55px;
-      border-radius: 50%;
-      background: radial-gradient(circle, #fff8b0, #ffb300, #ff6a00);
-      box-shadow:
-        0 0 15px #fff000,
-        0 0 35px #ff9900,
-        0 0 60px #ff6600;
-      cursor: pointer;
-      transition: 0.2s;
-      animation: pulse 1s infinite alternate;
-    }
-
-    @keyframes pulse {
-      from {
-        transform: scale(1);
-      }
-      to {
-        transform: scale(1.15);
-      }
-    }
-
-    .hint {
-      margin-top: 15px;
-      font-size: 16px;
-      color: #ffd28a;
-      opacity: 0.8;
-    }
-
-    @media (max-width: 600px) {
-      body {
-        padding: 12px;
-      }
-
-      .clock {
-        padding: 18px;
-      }
-
-      .game {
-        height: 260px;
-      }
-
-      .firefly {
-        width: 48px;
-        height: 48px;
-      }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nixie Tube Clock</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  canvas { display: block; image-rendering: auto; }
+  #info {
+    margin-top: 18px;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    letter-spacing: 5px;
+    color: rgba(140,90,20,0.45);
+    text-transform: uppercase;
+    user-select: none;
+  }
+</style>
 </head>
-
 <body>
-  <main class="app">
-    <h1>Ламповые часы</h1>
+<canvas id="c"></canvas>
+<div id="info"></div>
+<script>
+const C   = document.getElementById('c');
+const ctx = C.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
 
-    <section class="clock">
-      <div class="time" id="time">00:00:00</div>
-      <div class="date" id="date">Загрузка даты...</div>
-    </section>
+const TW = 82, TH = 200;
+const TGAP = 6, SGAP = 30, MARGIN = 24;
+const LW = 2*MARGIN + 6*TW + 2*TGAP + 2*SGAP;
+const LH = TH + 70;
 
-    <div class="score">Очки: <span id="score">0</span></div>
+C.style.width  = LW+'px';
+C.style.height = LH+'px';
+C.width  = LW*dpr;
+C.height = LH*dpr;
+ctx.scale(dpr, dpr);
 
-    <section class="game" id="game">
-      <div class="firefly" id="firefly"></div>
-    </section>
+const SEG = {
+  '0':[1,1,1,1,1,1,0],
+  '1':[0,1,1,0,0,0,0],
+  '2':[1,1,0,1,1,0,1],
+  '3':[1,1,1,1,0,0,1],
+  '4':[0,1,1,0,0,1,1],
+  '5':[1,0,1,1,0,1,1],
+  '6':[1,0,1,1,1,1,1],
+  '7':[1,1,1,0,0,0,0],
+  '8':[1,1,1,1,1,1,1],
+  '9':[1,1,1,1,0,1,1],
+};
 
-    <p class="hint">Мини-игра: нажимай на светящийся шарик и набирай очки.</p>
-  </main>
+function rrp(x,y,w,h,tl,tr,br,bl){
+  ctx.beginPath();
+  ctx.moveTo(x+tl,y);
+  ctx.lineTo(x+w-tr,y);   ctx.arcTo(x+w,y,    x+w,  y+tr,  tr);
+  ctx.lineTo(x+w,y+h-br); ctx.arcTo(x+w,y+h,  x+w-br,y+h,  br);
+  ctx.lineTo(x+bl,y+h);   ctx.arcTo(x,  y+h,  x,    y+h-bl,bl);
+  ctx.lineTo(x,y+tl);     ctx.arcTo(x,  y,    x+tl, y,      tl);
+  ctx.closePath();
+}
 
-  <script>
-    const timeElement = document.getElementById("time");
-    const dateElement = document.getElementById("date");
+function wire(x1,y1,x2,y2,on){
+  ctx.save();
+  ctx.lineCap='round';
+  if(on){
+    ctx.lineWidth=16; ctx.strokeStyle='rgba(255,70,0,0.07)';
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.lineWidth=9;  ctx.strokeStyle='rgba(255,110,0,0.18)';
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.lineWidth=5;  ctx.strokeStyle='rgba(255,165,50,0.36)';
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.lineWidth=2;  ctx.strokeStyle='#ffe8a0';
+    ctx.shadowColor='#ff8800'; ctx.shadowBlur=12;
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  } else {
+    ctx.lineWidth=1; ctx.strokeStyle='rgba(120,35,0,0.14)';
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  }
+  ctx.restore();
+}
 
-    function updateClock() {
-      const now = new Date();
+function drawDigit(cx,cy,d){
+  const s=SEG[String(d)]||SEG['0'];
+  const dw=44,dh=80;
+  const ox=cx-dw/2,oy=cy-dh/2,m=5,mid=oy+dh/2;
+  wire(ox+m,  oy,      ox+dw-m,oy,       s[0]);
+  wire(ox+dw, oy+m,    ox+dw,  mid-m,    s[1]);
+  wire(ox+dw, mid+m,   ox+dw,  oy+dh-m,  s[2]);
+  wire(ox+m,  oy+dh,   ox+dw-m,oy+dh,    s[3]);
+  wire(ox,    mid+m,   ox,     oy+dh-m,  s[4]);
+  wire(ox,    oy+m,    ox,     mid-m,    s[5]);
+  wire(ox+m,  mid,     ox+dw-m,mid,      s[6]);
+}
 
-      const hours = String(now.getHours()).padStart(2, "0");
-      const minutes = String(now.getMinutes()).padStart(2, "0");
-      const seconds = String(now.getSeconds()).padStart(2, "0");
+function drawTube(tx,ty,digit){
+  ctx.save();
+  const cx=tx+TW/2, topR=Math.round(TW*0.44), botR=7;
 
-      timeElement.textContent = `${hours}:${minutes}:${seconds}`;
+  rrp(tx,ty,TW,TH,topR,topR,botR,botR);
+  const bg=ctx.createLinearGradient(tx,ty,tx+TW,ty);
+  bg.addColorStop(0,   'rgba(7,3,16,0.97)');
+  bg.addColorStop(0.14,'rgba(18,9,35,0.88)');
+  bg.addColorStop(0.50,'rgba(4,2,9,0.96)');
+  bg.addColorStop(0.86,'rgba(18,9,35,0.88)');
+  bg.addColorStop(1,   'rgba(7,3,16,0.97)');
+  ctx.fillStyle=bg; ctx.fill();
 
-      dateElement.textContent = now.toLocaleDateString("ru-RU", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric"
-      });
+  ctx.save();
+  rrp(tx,ty,TW,TH,topR,topR,botR,botR);
+  ctx.clip();
+
+  ctx.strokeStyle='rgba(90,55,160,0.09)'; ctx.lineWidth=0.5;
+  for(let gx=tx;gx<=tx+TW;gx+=9){ctx.beginPath();ctx.moveTo(gx,ty);ctx.lineTo(gx,ty+TH);ctx.stroke();}
+  for(let gy=ty;gy<=ty+TH;gy+=9){ctx.beginPath();ctx.moveTo(tx,gy);ctx.lineTo(tx+TW,gy);ctx.stroke();}
+  ctx.strokeStyle='rgba(70,45,130,0.05)';
+  for(let dd=-TH;dd<TW+TH;dd+=18){ctx.beginPath();ctx.moveTo(tx+dd,ty);ctx.lineTo(tx+dd+TH,ty+TH);ctx.stroke();}
+
+  const plasG=ctx.createLinearGradient(cx,ty+TH*0.5,cx,ty+TH);
+  plasG.addColorStop(0,'transparent');
+  plasG.addColorStop(0.55,'rgba(55,75,220,0.06)');
+  plasG.addColorStop(1,'rgba(80,130,255,0.22)');
+  ctx.fillStyle=plasG; ctx.fillRect(tx,ty,TW,TH);
+
+  const dH=ctx.createRadialGradient(cx,ty+TH*0.43,0,cx,ty+TH*0.43,55);
+  dH.addColorStop(0,'rgba(255,100,0,0.13)');
+  dH.addColorStop(1,'transparent');
+  ctx.fillStyle=dH; ctx.fillRect(tx,ty,TW,TH);
+
+  drawDigit(cx, ty+TH*0.43, digit);
+
+  const hl=ctx.createLinearGradient(tx,ty,tx+TW*0.3,ty);
+  hl.addColorStop(0,'rgba(255,255,255,0.04)');
+  hl.addColorStop(1,'transparent');
+  ctx.fillStyle=hl; ctx.fillRect(tx,ty,TW,TH);
+
+  ctx.save(); ctx.globalAlpha=0.055;
+  ctx.strokeStyle='#aabbff'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.ellipse(cx,ty+topR*0.9,TW*0.36,topR*0.26,0,Math.PI*0.12,Math.PI*0.88);
+  ctx.stroke(); ctx.restore();
+
+  ctx.restore();
+
+  rrp(tx,ty,TW,TH,topR,topR,botR,botR);
+  ctx.strokeStyle='rgba(140,110,230,0.28)'; ctx.lineWidth=1.5; ctx.stroke();
+  rrp(tx+1.5,ty+1.5,TW-3,TH-3,topR-1,topR-1,botR-1,botR-1);
+  ctx.strokeStyle='rgba(200,190,255,0.05)'; ctx.lineWidth=1; ctx.stroke();
+
+  const blG=ctx.createRadialGradient(cx,ty+TH+4,1,cx,ty+TH+4,62);
+  blG.addColorStop(0,   'rgba(100,165,255,0.72)');
+  blG.addColorStop(0.35,'rgba(70,125,245,0.32)');
+  blG.addColorStop(0.70,'rgba(50,90,200,0.10)');
+  blG.addColorStop(1,   'transparent');
+  ctx.fillStyle=blG; ctx.fillRect(tx-30,ty+TH-8,TW+60,75);
+
+  const stG=ctx.createLinearGradient(tx,ty+TH,tx+TW,ty+TH);
+  stG.addColorStop(0,'transparent');
+  stG.addColorStop(0.2,'rgba(110,175,255,0.55)');
+  stG.addColorStop(0.5,'rgba(145,195,255,0.65)');
+  stG.addColorStop(0.8,'rgba(110,175,255,0.55)');
+  stG.addColorStop(1,'transparent');
+  ctx.fillStyle=stG; ctx.fillRect(tx,ty+TH-1,TW,5);
+
+  const bw=TW*0.68,bh=14,bx=cx-TW*0.68/2,by=ty+TH;
+  rrp(bx,by,bw,bh,0,0,4,4);
+  const bsG=ctx.createLinearGradient(bx,by,bx,by+bh);
+  bsG.addColorStop(0,'#18102c'); bsG.addColorStop(1,'#0c0818');
+  ctx.fillStyle=bsG; ctx.fill();
+  ctx.strokeStyle='rgba(170,150,255,0.18)'; ctx.lineWidth=1; ctx.stroke();
+
+  [0.14,0.34,0.66,0.86].forEach(px=>{
+    const pinX=tx+TW*px,p0=by+bh,p1=p0+20;
+    ctx.save(); ctx.lineCap='square';
+    ctx.beginPath();ctx.moveTo(pinX,p0);ctx.lineTo(pinX,p1);
+    ctx.lineWidth=4; ctx.strokeStyle='#160e28'; ctx.stroke();
+    ctx.lineWidth=1.5; ctx.strokeStyle='rgba(200,180,255,0.28)'; ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.restore();
+}
+
+function drawColon(cx,cy,on){
+  [-26,26].forEach(dy=>{
+    const y=cy+dy;
+    if(on){
+      const g=ctx.createRadialGradient(cx,y,0,cx,y,18);
+      g.addColorStop(0,'rgba(255,150,0,0.8)');
+      g.addColorStop(0.3,'rgba(255,90,0,0.35)');
+      g.addColorStop(1,'transparent');
+      ctx.fillStyle=g; ctx.fillRect(cx-18,y-18,36,36);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx,y,4.5,0,Math.PI*2);
+      ctx.fillStyle='#ffdd88'; ctx.shadowColor='#ff9900'; ctx.shadowBlur=14;
+      ctx.fill(); ctx.restore();
+    } else {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx,y,2.5,0,Math.PI*2);
+      ctx.fillStyle='rgba(120,40,0,0.2)'; ctx.fill(); ctx.restore();
     }
+  });
+}
 
-    setInterval(updateClock, 1000);
-    updateClock();
+function computeLayout(){
+  const pos=[],seps=[];
+  let x=MARGIN;
+  for(let g=0;g<3;g++){
+    for(let t=0;t<2;t++){pos.push(x);x+=TW;if(t===0)x+=TGAP;}
+    if(g<2){seps.push(x+SGAP/2);x+=SGAP;}
+  }
+  return{pos,seps};
+}
+const{pos,seps}=computeLayout();
+const tubeY=14, midY=tubeY+TH/2;
 
-    const game = document.getElementById("game");
-    const firefly = document.getElementById("firefly");
-    const scoreElement = document.getElementById("score");
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const infoEl=document.getElementById('info');
+let blinkOn=true;
+setInterval(()=>{blinkOn=!blinkOn;},500);
+function p2(n){return String(n).padStart(2,'0');}
 
-    let score = 0;
+function render(){
+  const now=new Date();
+  const digits=[...(p2(now.getHours())),...(p2(now.getMinutes())),...(p2(now.getSeconds()))];
 
-    function moveFirefly() {
-      const gameWidth = game.clientWidth;
-      const gameHeight = game.clientHeight;
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,LW,LH);
+  const bgG=ctx.createRadialGradient(LW/2,LH/2,0,LW/2,LH/2,LW*0.55);
+  bgG.addColorStop(0,'rgba(18,8,35,0.7)'); bgG.addColorStop(1,'transparent');
+  ctx.fillStyle=bgG; ctx.fillRect(0,0,LW,LH);
 
-      const fireflySize = firefly.offsetWidth;
+  pos.forEach((tx,i)=>drawTube(tx,tubeY,digits[i]));
+  seps.forEach(cx=>drawColon(cx,midY,blinkOn));
 
-      const maxX = gameWidth - fireflySize;
-      const maxY = gameHeight - fireflySize;
-
-      const randomX = Math.floor(Math.random() * maxX);
-      const randomY = Math.floor(Math.random() * maxY);
-
-      firefly.style.left = randomX + "px";
-      firefly.style.top = randomY + "px";
-    }
-
-    firefly.addEventListener("click", () => {
-      score++;
-      scoreElement.textContent = score;
-      moveFirefly();
-    });
-
-    window.addEventListener("resize", moveFirefly);
-
-    moveFirefly();
-  </script>
+  const d=now;
+  infoEl.textContent=DAYS[d.getDay()]+'   ·   '+d.getDate()+' '+MONTHS[d.getMonth()]+' '+d.getFullYear();
+  requestAnimationFrame(render);
+}
+render();
+</script>
 </body>
 </html>
